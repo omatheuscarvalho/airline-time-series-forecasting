@@ -12,7 +12,7 @@ I chose this dataset, which contains monthly totals of international airline pas
 
 Eu comcei com o básico, adicionando o dataset e lendo ele com pandas. Posteriormente, plotei o gráfico para entender como ele estava se comportando
 
-```
+```python
 url = 'https://raw.githubusercontent.com/jbrownlee/Datasets/master/airline-passengers.csv'
 data = pd.read_csv(url, index_col='Month', parse_dates=True)
 plt.plot(data)
