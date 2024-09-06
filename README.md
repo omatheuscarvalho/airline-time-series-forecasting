@@ -242,4 +242,105 @@ arima_pred_so = model_so_fit.forecast(steps=len(test_data_sazionalizado))
 
 Com esse ajuste, a modelagem foi otimizada, resultando em previsões mais precisas e adequadas às características sazonais dos dados.
 
-# LMP
+# Modelo MLP
+
+Após a implementação do modelo ARIMA, segui para a criação e análise de um modelo de rede neural de Perceptron Multicamadas (MLP), adequado para séries temporais com múltiplas variáveis.
+
+## Preparando os Dados
+
+A primeira etapa foi separar os dados em conjuntos de treino e teste, similar ao que fiz com o modelo ARIMA, mas desta vez com 78% dos dados alocados para treino. Aqui está o código utilizado:
+
+```python
+train_size_lmp = int(len(data) * 0.78)
+train_lmp = data[:train_size_lmp]
+test_lmp = data[train_size_lmp:]
+
+# Plotar dados de treino e teste
+plt.plot(train_lmp, label='Treino')
+plt.plot(test_lmp, label='Teste')
+plt.legend(['Treino', 'Teste'])
+plt.xlabel('Data')
+plt.ylabel('LMP')
+plt.show()
+```
+
+A divisão e a visualização dos dados permitiram observar que, assim como no ARIMA, havia um padrão claro de tendência e sazonalidade nos dados.
+
+## Normalizando os Dados
+
+Para melhorar a eficiência e estabilidade do modelo MLP, foi necessário normalizar os dados, já que redes neurais performam melhor quando os dados estão em uma escala semelhante. Usei o MinMaxScaler do sklearn para transformar os dados entre 0 e 1.
+
+```python
+scaler = MinMaxScaler()
+train_lmp_scaled = scaler.fit_transform(train_lmp)
+test_lmp_scaled = scaler.transform(test_lmp)
+```
+
+## Criando Dados Supervisionados
+
+Como o MLP é um modelo supervisionado, precisei formatar os dados para que o modelo pudesse aprender a prever o próximo valor da série temporal com base em valores anteriores. O parâmetro look_back foi definido como 12, significando que o modelo usaria os últimos 12 meses para prever o próximo valor
+
+```python
+def create_supervised_data(data, look_back=1):
+    X, y = [], []
+    for i in range(len(data)-look_back):
+        X.append(data[i:i+look_back, 0])
+        y.append(data[i+look_back, 0])
+    return np.array(X), np.array(y)
+
+look_back = 12
+X_train, y_train = create_supervised_data(train_lmp_scaled, look_back)
+X_test, y_test = create_supervised_data(test_lmp_scaled, look_back)
+```
+
+## Criando e Treinando o Modelo MLP
+
+Com os dados preparados, criei um modelo MLP simples, com uma única camada Dense e função de ativação linear. O modelo foi treinado por 10 épocas, utilizando o otimizador adam e a função de perda mean squared error (MSE).
+
+```python
+mlp_model = Sequential()
+mlp_model.add(Dense(1, input_dim=look_back))
+mlp_model.compile(loss='mse', optimizer='adam')
+
+# Treinando o modelo com 100 épocas
+mlp_model.fit(X_train, y_train, epochs=10, batch_size=16, verbose=1)
+```
+
+Após o treinamento, o modelo estava pronto para realizar previsões nos dados de teste.
+
+## Fazendo Previsões e Revertendo a Normalização
+
+Depois de prever os valores com o modelo treinado, foi necessário reverter a normalização para comparar as previsões diretamente com os valores reais:
+
+```python
+mlp_pred_scaled = mlp_model.predict(X_test)
+mlp_pred = scaler.inverse_transform(mlp_pred_scaled)
+```
+
+## Visualizando os Resultados
+
+A seguir, plotei os valores reais contra as previsões feitas pelo modelo MLP para avaliar a qualidade do ajuste:
+
+```python
+plt.plot(test_lmp[12:].values, label='Valores Reais')
+plt.plot(mlp_pred, label='Previsões MLP', linestyle='--')
+plt.title('Previsão de LMP com MLP')
+plt.xlabel('Data')
+plt.ylabel('LMP')
+plt.legend()
+plt.show()
+```
+
+![LMP prediction](./images/LMP1/1.png)
+A visualização mostrou que o modelo MLP conseguiu seguir razoavelmente bem a tendência dos dados, mas ainda apresentou algumas variações, especialmente em pontos onde a volatilidade era mais pronunciada.
+
+## Calculando o WMAPE
+
+Por fim, calculei o WMAPE para avaliar a precisão do modelo. Para isso, foi necessário reverter os valores de teste também para a escala original:
+
+```python
+y_test_rescaled = scaler.inverse_transform(y_test.reshape(-1, 1))
+wmape = np.sum(np.abs(y_test_rescaled - mlp_pred)) / np.sum(np.abs(y_test_rescaled))
+
+print(f"WMAPE: {wmape:.2f}")
+```
